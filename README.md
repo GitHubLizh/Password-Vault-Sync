@@ -32,7 +32,9 @@ npm start       # 启动本地服务（默认 http://127.0.0.1:47821）
 
 拿到 `PasswordVault-win-x64.zip` 的人只要三步：解压到一个固定位置 → 双击 `启动密码库.bat` → 浏览器自动打开 `http://127.0.0.1:47821`。包里的 `使用说明.txt` 就是写给这类读者的，涵盖主密码不可找回、数据实际存放位置和常见问题。
 
-**下载入口**：压缩包作为 GitHub Release 附件发布，不需要自己构建——最新版直链 <https://github.com/GitHubLizh/Password-Vault/releases/latest/download/PasswordVault-win-x64.zip>，发布页 <https://github.com/GitHubLizh/Password-Vault/releases> 有各版本记录。绿色包不入库（`release/` 已被 `.gitignore` 忽略），仓库里只有生成它的脚本。
+**下载入口**：压缩包作为 GitHub Release 附件发布，不需要自己构建——最新版直链 <https://github.com/GitHubLizh/Password-Vault-Sync/releases/latest/download/PasswordVault-win-x64.zip>，发布页 <https://github.com/GitHubLizh/Password-Vault-Sync/releases> 有 v0.1.0 ~ v0.1.2 各版本记录。绿色包不入库（`release/` 已被 `.gitignore` 忽略），仓库里只有生成它的脚本。
+
+2026-10-01 起本仓库是唯一的发布源。此前包发在 <https://github.com/GitHubLizh/Password-Vault>，三个版本的附件已按字节原样搬到本仓库（sha256 逐条核对一致），旧仓库保持原样但不再更新，它的 `releases/latest` 会永远停在 v0.1.2，新访客请以上面的直链为准。
 
 技术人员制作这个包：
 
