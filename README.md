@@ -32,11 +32,9 @@ npm start       # 启动本地服务（默认 http://127.0.0.1:47821）
 
 拿到 `PasswordVault-win-x64.zip` 的人只要三步：解压到一个固定位置 → 双击 `启动密码库.bat` → 浏览器自动打开 `http://127.0.0.1:47821`。包里的 `使用说明.txt` 就是写给这类读者的，涵盖主密码不可找回、数据实际存放位置和常见问题。
 
-**下载入口**：压缩包作为 GitHub Release 附件发布，不需要自己构建——最新版直链 <https://github.com/GitHubLizh/Password-Vault-Sync/releases/latest/download/PasswordVault-win-x64.zip>，发布页 <https://github.com/GitHubLizh/Password-Vault-Sync/releases> 有 v0.1.0 ~ v0.1.2 各版本记录。绿色包不入库（`release/` 已被 `.gitignore` 忽略），仓库里只有生成它的脚本。
+**获取安装包**：本仓库当前**不提供下载**。v0.1.0 ~ v0.1.2 在这里只保留 tag，Release 与附件已撤销（ADR 0007）——那三个包是纯本地版的构建物，同步版仓库不该分发"没有同步的安装包"。想要 v0.1.x 请用纯本地版仓库的发布页 <https://github.com/GitHubLizh/Password-Vault/releases>，两个仓库同名的 tag 指向同一批提交。本仓库自己的第一个包要等多设备同步做完才发，届时附件名为 `PasswordVaultSync-win-x64.zip`，不再与纯本地版撞名。绿色包不入库（`release/` 已被 `.gitignore` 忽略），仓库里只有生成它的脚本。
 
-这里的 v0.1.0 ~ v0.1.2 是两条产品线共同的祖先发布：纯本地版 <https://github.com/GitHubLizh/Password-Vault> 仍在独立维护和发版，两边同名的 tag 指向同一批提交、附件字节也逐条核对一致，谁都不是对方的存档。往后两边的包会各自演进，而附件同名 `PasswordVault-win-x64.zip`——下载时请按仓库确认是哪条产品线，别把对方的 latest 当成本项目的最新版。
-
-技术人员制作这个包：
+技术人员自建当前这个纯本地形态的包，产物与 v0.1.2 的行为一致：
 
 ```bash
 npm run package                   # 完整构建 + 组装目录 + 生成 zip
