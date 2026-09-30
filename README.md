@@ -1,6 +1,6 @@
 # Password-Vault · 本地密码库
 
-一个只跑在本机的密码管理应用：凭据加密保存在你自己的磁盘上，没有云同步、没有第三方服务，浏览器打开 `http://127.0.0.1:47821` 即可使用。
+一个跑在本机的密码管理应用：凭据加密保存在你自己的磁盘上，服务只监听本机，浏览器打开 `http://127.0.0.1:47821` 即可使用。本仓库是**同步版**——目标是在这份本地保存之上增加多设备数据同步（范围见 ADR 0007）。同步尚未落地，在它可用之前，本仓库的行为与只做单机的**纯本地版**（<https://github.com/GitHubLizh/Password-Vault>，独立维护、独立发版）一致。
 
 ## 两种启动方式
 
@@ -34,7 +34,7 @@ npm start       # 启动本地服务（默认 http://127.0.0.1:47821）
 
 **下载入口**：压缩包作为 GitHub Release 附件发布，不需要自己构建——最新版直链 <https://github.com/GitHubLizh/Password-Vault-Sync/releases/latest/download/PasswordVault-win-x64.zip>，发布页 <https://github.com/GitHubLizh/Password-Vault-Sync/releases> 有 v0.1.0 ~ v0.1.2 各版本记录。绿色包不入库（`release/` 已被 `.gitignore` 忽略），仓库里只有生成它的脚本。
 
-2026-10-01 起本仓库是唯一的发布源。此前包发在 <https://github.com/GitHubLizh/Password-Vault>，三个版本的附件已按字节原样搬到本仓库（sha256 逐条核对一致），旧仓库保持原样但不再更新，它的 `releases/latest` 会永远停在 v0.1.2，新访客请以上面的直链为准。
+这里的 v0.1.0 ~ v0.1.2 是两条产品线共同的祖先发布：纯本地版 <https://github.com/GitHubLizh/Password-Vault> 仍在独立维护和发版，两边同名的 tag 指向同一批提交、附件字节也逐条核对一致，谁都不是对方的存档。往后两边的包会各自演进，而附件同名 `PasswordVault-win-x64.zip`——下载时请按仓库确认是哪条产品线，别把对方的 latest 当成本项目的最新版。
 
 技术人员制作这个包：
 
@@ -116,6 +116,6 @@ scripts/    启动脚本 launch.mjs、打包脚本 package.mjs、发布前自检
 ## 已知限制
 
 - 单文件 `vault.pvlt` 为整库读写，条目很多时保存开销会上升。
-- 不做跨设备同步——这是设计边界而非待补功能（ADR 0006）：换机器需手动迁移存储目录或导入备份。
+- 多设备同步尚未实现——它是本仓库要建的目标能力（ADR 0007），不是已完成的功能，也不是当初 ADR 0006 声明的设计边界：现阶段换机器仍需手动迁移存储目录或导入加密备份。
 - 界面为简体中文，暂无其他语言。
 - 分发只有 Windows x64 绿色包：靠 `.bat` 启动、控制台窗口即服务进程，没有安装向导、托盘和代码签名。
