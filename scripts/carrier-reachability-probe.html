@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>载体可达性探针 · Cloudflare / 对象存储</title>
+<style>
+  body { font: 15px/1.6 system-ui, -apple-system, "Microsoft YaHei", sans-serif; margin: 18px auto; max-width: 640px; padding: 0 14px; color: #1c1f24; }
+  h1 { font-size: 19px; margin: 0 0 6px; }
+  p.hint { color: #5b6472; font-size: 13px; margin: 0 0 14px; }
+  button { font: inherit; padding: 9px 16px; border-radius: 8px; border: 1px solid #c3ccd8; background: #f5f8fc; }
+  table { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 13px; }
+  th, td { border-bottom: 1px solid #e3e8ef; padding: 7px 6px; text-align: left; vertical-align: top; }
+  th { color: #5b6472; font-weight: 600; }
+  .ok { color: #147d3b; font-weight: 600; }
+  .bad { color: #b3261e; font-weight: 600; }
+  .wait { color: #5b6472; }
+  textarea { width: 100%; height: 190px; font: 12px/1.5 ui-monospace, Consolas, monospace; margin-top: 12px; }
+  code { background: #f0f2f6; padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>载体可达性探针</h1>
+<p class="hint">用途：确认在<strong>关掉 WiFi、只用蜂窝网络、没开任何代理</strong>的手机上，Cloudflare 边缘与对照站点能不能连上。<br />
+先打开移动数据、关 WiFi 和代理，再打开本页，点「开始测试」，最后把结果框里的文字整段复制发出去。<br />
+<strong>备用办法（本页被拦截时用）</strong>：手机浏览器地址栏直接访问 <code>https://1.1.1.1/cdn-cgi/trace</code>，页面出现 <code>colo=</code> 这样的行就说明 Cloudflare 可达。</p>
+<button id="run">开始测试</button>
+<table>
+  <thead><tr><th>目标</th><th>判断</th><th>结果</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<textarea id="report" readonly placeholder="结果会出现在这里"></textarea>
+<script>
+// no-cors 拿不到响应内容，但拿得到「连上了没有」：opaque 成功=网络层通，抛错=不通。
+// 这已经足够回答可达性；跨源读写与条件写支持度不在这里测。
+const TARGETS = [
+  { name: 'Cloudflare 边缘 · 1.1.1.1/cdn-cgi/trace', url: 'https://1.1.1.1/cdn-cgi/trace', expect: '通 = Cloudflare 在你当前网络可用', key: 'cf' },
+  { name: 'Cloudflare 测速端点 speed.cloudflare.com', url: 'https://speed.cloudflare.com/__down?bytes=1', expect: '通 = Workers/R2 公共域名大概率可达', key: 'cf2' },
+  { name: '对照 · 国内站点 (www.baidu.com)', url: 'https://www.baidu.com/favicon.ico', expect: '对照行：不通说明整机没网，不是 CF 的问题', key: 'cn' },
+  { name: '对照 · Google (clients3.google.com)', url: 'https://clients3.google.com/generate_204', expect: '对照行：国内长期不通属正常，仅作参照', key: 'g' },
+];
+const rows = document.getElementById('rows');
+const report = document.getElementById('report');
+function line(name, verdict, detail) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td>' + name + '</td><td class="' + (verdict === '通' ? 'ok' : verdict === '不通' ? 'bad' : 'wait') + '">' + verdict + '</td><td>' + detail + '</td>';
+  rows.appendChild(tr);
+  return { name, verdict, detail };
+}
+async function probe(target) {
+  const started = performance.now();
+  try {
+    await fetch(target.url + (target.url.includes('?') ? '&' : '?') + 't=' + Date.now(), { mode: 'no-cors', cache: 'no-store', redirect: 'follow' });
+    return { verdict: '通', detail: Math.round(performance.now() - started) + ' ms' };
+  } catch (error) {
+    return { verdict: '不通', detail: (error && error.message ? error.message : String(error)) + ' / ' + Math.round(performance.now() - started) + ' ms' };
+  }
+}
+document.getElementById('run').addEventListener('click', async () => {
+  rows.innerHTML = ''; report.value = '';
+  const conn = navigator.connection || {};
+  const results = [];
+  for (const target of TARGETS) results.push(Object.assign({ expect: target.expect }, target, await probe(target)));
+  results.forEach(r => line(r.name, r.verdict, r.detail));
+  const head = ['载体可达性探针结果', '时间: ' + new Date().toString(), 'UA: ' + navigator.userAgent,
+    '网络线索: ' + (conn.effectiveType || '未知') + ' / downlink=' + (conn.downlink ?? '?') + 'Mbps / rtt=' + (conn.rtt ?? '?') + 'ms', ''].join('\n');
+  report.value = head + results.map(r => r.name + ' → ' + r.verdict + '（' + r.detail + '）').join('\n');
+});
+</script>
+</body>
+</html>
