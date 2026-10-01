@@ -25,6 +25,9 @@
 先打开移动数据、关 WiFi 和代理，再打开本页，点「开始测试」，最后把结果框里的文字整段复制发出去。<br />
 <strong>备用办法（本页被拦截时用）</strong>：手机浏览器地址栏直接访问 <code>https://1.1.1.1/cdn-cgi/trace</code>，页面出现 <code>colo=</code> 这样的行就说明 Cloudflare 可达。</p>
 <button id="run">开始测试</button>
+<p class="hint" style="margin-top:12px"><strong>第 2 轮才用得上的口子</strong>：把真实部署出来的地址一行一个贴进来（Worker 域名、桶域名、自定义域名都行）。<br />
+<strong>为什么要"真实部署"</strong>：不存在或未部署的子域名会返回 NXDOMAIN，在浏览器里和被拦长得一模一样（同为 <code>Failed to fetch</code>），拿它测不出任何结论。</p>
+<textarea id="custom" placeholder="https://xxxx.workers.dev/ping&#10;https://xxxx.r2.dev/vaults/xxx.json&#10;https://你自己的域名/ping" style="height:84px;margin-top:0"></textarea>
 <table>
   <thead><tr><th>目标</th><th>判断</th><th>结果</th></tr></thead>
   <tbody id="rows"></tbody>
@@ -34,8 +37,8 @@
 // no-cors 拿不到响应内容，但拿得到「连上了没有」：opaque 成功=网络层通，抛错=不通。
 // 这已经足够回答可达性；跨源读写与条件写支持度不在这里测。
 const TARGETS = [
-  { name: 'Cloudflare 边缘 · 1.1.1.1/cdn-cgi/trace', url: 'https://1.1.1.1/cdn-cgi/trace', expect: '通 = Cloudflare 在你当前网络可用', key: 'cf' },
-  { name: 'Cloudflare 测速端点 speed.cloudflare.com', url: 'https://speed.cloudflare.com/__down?bytes=1', expect: '通 = Workers/R2 公共域名大概率可达', key: 'cf2' },
+  { name: 'IP 字面量直连 · 1.1.1.1/cdn-cgi/trace', url: 'https://1.1.1.1/cdn-cgi/trace', expect: '注意：这行不通<strong>不代表</strong> Cloudflare 不可用。它只测 IP 直连；要判定 CF 边缘请看下一行。若下一行通而本行不通，是 IP 直连被拦。', key: 'cf' },
+  { name: 'Cloudflare 边缘 · speed.cloudflare.com', url: 'https://speed.cloudflare.com/__down?bytes=1', expect: '通 = CF 的 HTTPS 边缘在你当前网络可用（域名 + SNI 路径）', key: 'cf2' },
   { name: '对照 · 国内站点 (www.baidu.com)', url: 'https://www.baidu.com/favicon.ico', expect: '对照行：不通说明整机没网，不是 CF 的问题', key: 'cn' },
   { name: '对照 · Google (clients3.google.com)', url: 'https://clients3.google.com/generate_204', expect: '对照行：国内长期不通属正常，仅作参照', key: 'g' },
 ];
@@ -59,8 +62,10 @@ async function probe(target) {
 document.getElementById('run').addEventListener('click', async () => {
   rows.innerHTML = ''; report.value = '';
   const conn = navigator.connection || {};
+  const extras = document.getElementById('custom').value.split('\n').map(s => s.trim()).filter(s => /^https:\/\/\S+/.test(s))
+    .map((url, i) => ({ name: '自填 ' + (i + 1) + ' · ' + url.replace(/^https:\/\//, '').slice(0, 64), url, expect: '自定目标' }));
   const results = [];
-  for (const target of TARGETS) results.push(Object.assign({ expect: target.expect }, target, await probe(target)));
+  for (const target of TARGETS.concat(extras)) results.push(Object.assign({ expect: target.expect }, target, await probe(target)));
   results.forEach(r => line(r.name, r.verdict, r.detail));
   const head = ['载体可达性探针结果', '时间: ' + new Date().toString(), 'UA: ' + navigator.userAgent,
     '网络线索: ' + (conn.effectiveType || '未知') + ' / downlink=' + (conn.downlink ?? '?') + 'Mbps / rtt=' + (conn.rtt ?? '?') + 'ms', ''].join('\n');

@@ -1,6 +1,10 @@
 # 云端载体：对象存储 + 几十行只读代理 Worker（状态：待实测）
 
 > **状态（2026-10-01）**：proposed。这条决定附带两个**尚未实测**的前提，跑通前不许当已确认：① Cloudflare 在用户手机**蜂窝网络、无代理**下的可达性；② 对象存储条件写（`If-Match` → 412）与桶 CORS 在真实桶上的行为。探针见 `scripts/carrier-reachability-probe.html`（手机关 WiFi 打开、跑完把结果框文字复制回来）。之所以桌面测出来的结果不算数：本机的 GitHub 推送要走 `127.0.0.1:29290` 代理，桌面连通性不代表手机网络。**若探针不通，本条作废，载体改走阿里云 OSS / 腾讯 COS，并且那两家的条件写与 CORS 支持度要重新实测**——不许拿"兼容 S3"当确认。
+>
+> **第 1 轮实测读数（2026-10-01，手机蜂窝网，原文与判读见 `docs/specs/evidence/2026-10-01-载体可达性-第1轮.md`）**：`speed.cloudflare.com` **322 ms 通**，`https://1.1.1.1/` IP 字面量直连 30 s 失败，对照行 baidu 87 ms 通。正确读法是**拦的是到 1.1.1.1 的 IP 直连，不是 Cloudflare 的 HTTPS 边缘**——本设计只依赖域名，从不直连该 IP，所以这一行不构成红灯。缺口仍在：`*.workers.dev` 与 `*.r2.dev` 这两个我们真正要用的域名类**尚未测到**，且无法零部署补测（未部署的子域名返回 NXDOMAIN，在浏览器里与被拦同为 `Failed to fetch`）。另有一处未排除的混杂：本轮在华为浏览器（ArkWeb/HuaweiBrowser）中跑，其自带的网页保护通道可能拦跨源 fetch——地址栏直访 `https://1.1.1.1/cdn-cgi/trace` 可把"网络层不通"与"浏览器 fetch 策略拦 IP"分开。状态仍为 proposed。
+
+
 
 已核实的文档级事实：S3 `PutObject` 支持 `If-Match`（比对 ETag，不匹配 412，并发下还可能 409/404），要求 SigV4 签名且调用方同时具备 `s3:PutObject` 与 `s3:GetObject`；R2 扩展文档称同名条件头与 PutObject 行为一致。预签名 URL 在 SigV4 下**最长 7 天**，且本质是 bearer token——这是"手机端靠预签名 URL"被否决的原因（每 7 天人工换一次不可接受）。
 
