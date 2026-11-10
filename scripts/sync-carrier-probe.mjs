@@ -1,9 +1,11 @@
-// 阶段 0 载体实测骨架（ADR 0022 / spec 故事 1–5）：真 HTTP 走完
-// 推 → 改 → 拉 → 最小合流 → 旧 ETag If-Match 应 412 → 重新合流后再推应 200 → 删 → 应 404。
+// 阶段 0 载体实测骨架（ADR 0022 / spec 故事 1–5；写转发闭环按修订 spec 2026-11-10 / ADR 0025）：
+// 真 HTTP 走完 推 → 改 → 拉 → 最小合流 → 旧 ETag If-Match 应 412 → 重新合流后再推应 200 → 删 → 应 404；
+// 给了 --worker 再补一段经代理的写转发闭环（W①–W⑧：直写播种 → 代理拉 → 代理条件写 → 旧 ETag 412 → 复核 → 清理）。
 // 默认打本地假桶（scripts/sync-fake-bucket.mjs）自检；给了云凭证与真 endpoint 就打真载体。
-// 用法（本地）：node scripts/sync-fake-bucket.mjs --port 8787 &  node scripts/sync-carrier-probe.mjs
+// 用法（本地全套）：node scripts/sync-fake-bucket.mjs --port 8787 &  node scripts/sync-worker-local.mjs --upstream http://127.0.0.1:8787 --bucket probe --port 8790 &  node scripts/sync-carrier-probe.mjs --worker http://127.0.0.1:8790
 // 用法（真桶）：node scripts/sync-carrier-probe.mjs --endpoint https://<ACCOUNT_ID>.r2.cloudflarestorage.com \
-//                 --bucket <桶名> --access-key-id <AK> --secret-access-key <SK> --region auto
+//                 --bucket <桶名> --access-key-id <AK> --secret-access-key <SK> --region auto \
+//                 [--worker https://<你的 Worker>.workers.dev]
 // 注意：脚本不读任何真实密码库，快照全是合成数据。
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 
@@ -20,6 +22,15 @@ const accessKeyId = flag('access-key-id', '');
 const secretAccessKey = flag('secret-access-key', '');
 const key = `password-vault-sync/${randomUUID().slice(0, 8)}.json`;
 const base = new URL(`${endpoint}/${bucket}/${key}`);
+const workerUrl = flag('worker', '').replace(/\/+$/, '');
+const workerBase = workerUrl ? new URL(`${workerUrl}/vaults/${key.slice('password-vault-sync/'.length)}`) : null;
+// 经代理的裸 fetch：代理侧不鉴权（0025 已知限制），也不参与签名——签名单属于直发对象存储那条路。
+const wsend = async (method, body, extraHeaders = {}) => {
+  const started = Date.now();
+  const response = await fetch(workerBase, { method, headers: extraHeaders, body });
+  const text = await response.text();
+  return { status: response.status, etag: response.headers.get('etag') ?? '', body: text, ms: Date.now() - started };
+};
 
 if (!accessKeyId !== !secretAccessKey) fail('--access-key-id 与 --secret-access-key 必须成对给出');
 if (accessKeyId && base.protocol === 'http:') fail('不允许对 http:// 端点发送签名请求，请把 --endpoint 换成 https 的');
@@ -127,6 +138,24 @@ check('⑨ 回读内容应与合流结果一致', [200], same, same.body === mer
 check('⑩ 删除后回读应 404（ADR 0017 把 404 当异常）', [204, 200], await send('DELETE'));
 check('⑪ 对象已消失', [404], await send('GET'));
 
+if (workerUrl) {
+  console.log(`\n写转发闭环（经 ${workerUrl} 转发，ADR 0025）：`);
+  check('W① 直写播种（If-None-Match: *）', [200], await send('PUT', baseSnapshot, { 'if-none-match': '*' }));
+  const wread = await wsend('GET');
+  check('W② 经代理拉回', [200], wread, wread.body === baseSnapshot ? '字节一致' : `内容不符：${wread.body.length} B`);
+  const wput = await wsend('PUT', localSnapshot, { 'if-match': wread.etag });
+  check('W③ 经代理条件写（If-Match 当前 ETag）', [200], wput, `etag ${wread.etag || '—'} → ${wput.etag || '—'}`);
+  check('W④ 经代理旧 ETag 写应 412', [412], await wsend('PUT', localSnapshot, { 'if-match': wread.etag }));
+  const wread2 = await wsend('GET');
+  check('W⑤ 回读应等于 W③ 写入的内容', [200], wread2, wread2.body === localSnapshot ? '字节一致' : `内容不符：${wread2.body.length} B`);
+  const direct = await send('GET');
+  check('W⑥ 直读复核（代理写与直写打到同一对象）', [200], direct, direct.body === localSnapshot ? '字节一致' : `内容不符：${direct.body.length} B`);
+  check('W⑦ 直删清理', [204, 200], await send('DELETE'));
+  check('W⑧ 代理拉回应 404（NO_CLOUD_COPY）', [404], await wsend('GET'));
+} else {
+  console.log('\n（未给 --worker：跳过写转发闭环。真实 Worker 部署后加 --worker https://<你的 Worker>.workers.dev 补跑。）');
+}
+
 const failures = steps.filter((step) => !step.passed);
 console.log(`\n合计 ${steps.length} 步，失败 ${failures.length} 步。参与签名的头：${first.requestHeaders}`);
-console.log(failures.length ? '结论：载体语义与本脚本假设不一致，先把差异记进 evidence 再继续。' : '结论：条件写语义闭环通过（本次仅为'+(accessKeyId ? '真桶' : '本地假桶')+'）。');
+console.log(failures.length ? '结论：载体语义与本脚本假设不一致，先把差异记进 evidence 再继续。' : '结论：条件写语义' + (workerUrl ? '与写转发' : '') + '闭环通过（本次仅为' + (accessKeyId ? '真桶' : '本地假桶') + '）。');

@@ -2,10 +2,17 @@ name = "password-vault-sync-probe"
 main = "index.mjs"
 compatibility_date = "2026-10-01"
 # 部署后即可得到 https://password-vault-sync-probe.<你的子域>.workers.dev
-# 阶段 0 只要它响 /ping，用来把 workers.dev 域名类的可达性测出来（第 2 轮探针的自填地址）。
+# 只要它响 /ping，就能测 workers.dev 域名类的可达性；测读写转发需要下面任一路线的配置（ADR 0025）。
 workers_dev = true
 
-# 阶段 2 的只读代理才需要桶绑定。先注释掉：桶名不存在会让部署直接失败。
+# 路线①（首选）：R2 binding——读 get、写 put(onlyIf) 条件写，凭证就是 binding，Worker 内零 AK/SK。
+# 测转发前解注释并填上你建的桶名（桶名不存在会让部署直接失败）：
 # [[r2_buckets]]
 # binding = "VAULT_SYNC"
-# bucket_name = "<换成你的 R2 桶名>"
+# bucket_name = "password-vault-sync"   # ← 换成你的桶名
+
+# 路线②（备选）：binding 的 onlyIf 在真桶上实测不通过时启用——读与写都改走 SigV4 子请求打 S3 API。
+# [vars]
+# VAULT_WRITE_ENDPOINT = "https://<ACCOUNT_ID>.r2.cloudflarestorage.com"
+# VAULT_WRITE_BUCKET = "password-vault-sync"   # ← 换成你的桶名
+# AK/SK 不进本文件：npx wrangler secret put VAULT_WRITE_AK；npx wrangler secret put VAULT_WRITE_SK
